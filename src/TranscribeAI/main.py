@@ -31,10 +31,20 @@ Examples:
     parser.add_argument('--output', help='Output transcript file path')
     parser.add_argument('--no-summary', action='store_true',
                        help='Skip summarization step')
-    parser.add_argument('--ollama-model', default='llama3.2',
-                       help='Ollama model for summarization (default: llama3.2)')
-    parser.add_argument('--ollama-method', choices=['library', 'api'], default='library',
-                       help='Ollama method to use (default: library)')
+    
+    # Summarization options
+    summary_group = parser.add_argument_group('Summarization Options')
+    summary_group.add_argument('--summary-provider', choices=['ollama', 'openai', 'anthropic', 'gemini'], 
+                              default='ollama', help='AI provider for summarization (default: ollama)')
+    summary_group.add_argument('--summary-model', 
+                              help='Model to use for summarization (provider-specific defaults if not specified)')
+    summary_group.add_argument('--summary-method', choices=['library', 'api'], default='library',
+                              help='Method for Ollama (ignored for other providers, default: library)')
+    
+    # Backward compatibility (deprecated)
+    summary_group.add_argument('--ollama-model', help='DEPRECATED: Use --summary-model with --summary-provider ollama')
+    summary_group.add_argument('--ollama-method', choices=['library', 'api'], 
+                              help='DEPRECATED: Use --summary-method')
     
     # HuggingFace specific options
     hf_group = parser.add_argument_group('HuggingFace Options')
@@ -94,14 +104,29 @@ def main():
             if args.batch_size:
                 kwargs['batch_size'] = args.batch_size
         
+        # Handle backward compatibility and prepare summarization args
+        summary_kwargs = {}
+        if args.ollama_model:
+            import warnings
+            warnings.warn("--ollama-model is deprecated. Use --summary-model with --summary-provider ollama", 
+                         DeprecationWarning)
+            if args.summary_provider == 'ollama':
+                summary_kwargs['summary_model'] = args.ollama_model
+        if args.ollama_method:
+            import warnings
+            warnings.warn("--ollama-method is deprecated. Use --summary-method", DeprecationWarning)
+            summary_kwargs['summary_method'] = args.ollama_method
+        
         # Process the media file
         result = transcribe_media(
             media_file=str(media_path),
             backend=args.backend,
             output_txt=args.output,
             summarize=not args.no_summary,
-            ollama_model=args.ollama_model,
-            ollama_method=args.ollama_method,
+            summary_provider=args.summary_provider,
+            summary_method=args.summary_method,
+            summary_model=args.summary_model,
+            **summary_kwargs,
             **kwargs
         )
         

@@ -69,8 +69,9 @@ def process_media_file(media_file, output_txt=None, model_size='base',
         backend='whisper',
         output_txt=output_txt,
         summarize=summarize,
-        ollama_model=ollama_model,
-        ollama_method=ollama_method,
+        summary_provider='ollama',
+        summary_model=ollama_model,
+        summary_method=ollama_method,
         model_size=model_size
     )
 

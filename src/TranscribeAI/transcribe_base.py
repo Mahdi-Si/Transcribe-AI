@@ -14,7 +14,7 @@ def setup_logging():
 
 logger = setup_logging()
 
-# Try to import ollama library
+# Try to import optional libraries with graceful fallback
 try:
     import ollama
     OLLAMA_LIBRARY_AVAILABLE = True
@@ -22,6 +22,30 @@ try:
 except ImportError:
     OLLAMA_LIBRARY_AVAILABLE = False
     logger.info("Ollama library not found - only API method available")
+
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+    logger.info("OpenAI library detected")
+except ImportError:
+    OPENAI_AVAILABLE = False
+    logger.info("OpenAI library not found - install with: pip install openai")
+
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+    logger.info("Anthropic library detected")
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+    logger.info("Anthropic library not found - install with: pip install anthropic")
+
+try:
+    from google import genai
+    GEMINI_AVAILABLE = True
+    logger.info("Google Gemini library detected")
+except ImportError:
+    GEMINI_AVAILABLE = False
+    logger.info("Google Gemini library not found - install with: pip install google-genai")
 
 # Constants
 AUDIO_EXTENSIONS = {'.wav', '.mp3', '.aac', '.flac', '.ogg', '.m4a', '.wma', '.aiff'}
@@ -90,10 +114,182 @@ class MediaProcessor:
         return audio_file
 
 class SummarizationEngine:
-    """Handles text summarization using Ollama."""
+    """Handles text summarization using multiple AI providers."""
     
-    def __init__(self, ollama_url='http://localhost:11434'):
+    def __init__(self, ollama_url='http://localhost:11434', 
+                 openai_api_key=None, anthropic_api_key=None, gemini_api_key=None):
         self.ollama_url = ollama_url
+        self.openai_client = None
+        self.anthropic_client = None
+        self.gemini_client = None
+        
+        # Initialize OpenAI client
+        if openai_api_key or OPENAI_AVAILABLE:
+            try:
+                self.openai_client = openai.OpenAI(api_key=openai_api_key or os.getenv('OPENAI_API_KEY'))
+            except Exception as e:
+                logger.warning(f"OpenAI client initialization failed: {e}")
+        
+        # Initialize Anthropic client  
+        if anthropic_api_key or ANTHROPIC_AVAILABLE:
+            try:
+                self.anthropic_client = anthropic.Anthropic(api_key=anthropic_api_key or os.getenv('ANTHROPIC_API_KEY'))
+            except Exception as e:
+                logger.warning(f"Anthropic client initialization failed: {e}")
+        
+        # Initialize Gemini client
+        if gemini_api_key or GEMINI_AVAILABLE:
+            try:
+                self.gemini_client = genai.Client(api_key=gemini_api_key or os.getenv('GEMINI_API_KEY'))
+            except Exception as e:
+                logger.warning(f"Gemini client initialization failed: {e}")
+    
+    def summarize_with_openai(self, text, output_file, model='gpt-4o-mini', max_tokens=1000):
+        """Summarize text using OpenAI API.
+        
+        Args:
+            text (str): Text to summarize.
+            output_file (str): Path to save the summary.
+            model (str): OpenAI model to use (e.g., 'gpt-4o-mini', 'gpt-4').
+            max_tokens (int): Maximum tokens for response.
+            
+        Returns:
+            str: Path to the summary file.
+        """
+        if not self.openai_client:
+            raise ImportError("OpenAI client not available. Install with: pip install openai")
+        
+        logger.info(f'Summarizing text using OpenAI {model}...')
+        prompt = self._create_summarization_prompt(text)
+        
+        try:
+            response = self.openai_client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=0.3
+            )
+            
+            summary = response.choices[0].message.content.strip()
+            if not summary:
+                raise ValueError("Empty response from OpenAI model")
+            
+            self._save_summary(summary, output_file, model, "OpenAI API")
+            logger.info(f'Summary complete, saved as {output_file}')
+            return output_file
+            
+        except Exception as e:
+            logger.error(f"Error during OpenAI summarization: {str(e)}")
+            raise
+    
+    def summarize_with_anthropic(self, text, output_file, model='claude-3-5-haiku-20241022', max_tokens=1000):
+        """Summarize text using Anthropic Claude API.
+        
+        Args:
+            text (str): Text to summarize.
+            output_file (str): Path to save the summary.
+            model (str): Claude model to use (e.g., 'claude-3-5-haiku-20241022', 'claude-3-5-sonnet-20241022').
+            max_tokens (int): Maximum tokens for response.
+            
+        Returns:
+            str: Path to the summary file.
+        """
+        if not self.anthropic_client:
+            raise ImportError("Anthropic client not available. Install with: pip install anthropic")
+        
+        logger.info(f'Summarizing text using Anthropic {model}...')
+        prompt = self._create_summarization_prompt(text)
+        
+        try:
+            response = self.anthropic_client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                temperature=0.3,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            
+            summary = response.content[0].text.strip()
+            if not summary:
+                raise ValueError("Empty response from Anthropic model")
+            
+            self._save_summary(summary, output_file, model, "Anthropic API")
+            logger.info(f'Summary complete, saved as {output_file}')
+            return output_file
+            
+        except Exception as e:
+            logger.error(f"Error during Anthropic summarization: {str(e)}")
+            raise
+    
+    def summarize_with_gemini(self, text, output_file, model='gemini-2.0-flash', **kwargs):
+        """Summarize text using Google Gemini API.
+        
+        Args:
+            text (str): Text to summarize.
+            output_file (str): Path to save the summary.  
+            model (str): Gemini model to use (e.g., 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro').
+            **kwargs: Additional generation parameters.
+            
+        Returns:
+            str: Path to the summary file.
+        """
+        if not self.gemini_client:
+            raise ImportError("Google Gemini client not available. Install with: pip install google-genai")
+        
+        logger.info(f'Summarizing text using Google {model}...')
+        prompt = self._create_summarization_prompt(text)
+        
+        try:
+            response = self.gemini_client.models.generate_content(
+                model=model,
+                contents=prompt
+            )
+            
+            summary = response.text.strip()
+            if not summary:
+                raise ValueError("Empty response from Gemini model")
+            
+            self._save_summary(summary, output_file, model, "Google Gemini API")
+            logger.info(f'Summary complete, saved as {output_file}')
+            return output_file
+            
+        except Exception as e:
+            logger.error(f"Error during Gemini summarization: {str(e)}")
+            raise
+    
+    def summarize_text(self, text, output_file, provider='ollama', method='library', **kwargs):
+        """Universal summarization method that routes to appropriate provider.
+        
+        Args:
+            text (str): Text to summarize.
+            output_file (str): Path to save the summary.
+            provider (str): Provider to use ('ollama', 'openai', 'anthropic', 'gemini').
+            method (str): Method for Ollama ('library' or 'api'), ignored for others.
+            **kwargs: Provider-specific parameters.
+            
+        Returns:
+            str: Path to the summary file.
+        """
+        provider = provider.lower()
+        
+        if provider == 'ollama':
+            model = kwargs.get('model', 'llama3.2')
+            if method.lower() == 'library':
+                return self.summarize_with_library(text, output_file, model)
+            else:
+                return self.summarize_with_api(text, output_file, model)
+        elif provider == 'openai':
+            model = kwargs.get('model', 'gpt-4o-mini')
+            max_tokens = kwargs.get('max_tokens', 1000)
+            return self.summarize_with_openai(text, output_file, model, max_tokens)
+        elif provider == 'anthropic':
+            model = kwargs.get('model', 'claude-3-5-haiku-20241022')
+            max_tokens = kwargs.get('max_tokens', 1000)
+            return self.summarize_with_anthropic(text, output_file, model, max_tokens)
+        elif provider == 'gemini':
+            model = kwargs.get('model', 'gemini-2.0-flash')
+            return self.summarize_with_gemini(text, output_file, model, **kwargs)
+        else:
+            raise ValueError(f"Unsupported provider: {provider}. Choose from: ollama, openai, anthropic, gemini")
     
     def summarize_with_library(self, text, output_file, model='llama3.2'):
         """Summarize text using Ollama Python library.
@@ -218,15 +414,16 @@ class BaseTranscriber(ABC):
         pass
     
     def process_media_file(self, media_file, output_txt=None, summarize=True, 
-                          ollama_model='llama3.2', ollama_method='library', **kwargs):
+                          summary_provider='ollama', summary_method='library', summary_model=None, **kwargs):
         """Complete pipeline: convert media to audio, transcribe, and optionally summarize.
         
         Args:
             media_file (str): Path to the media file.
             output_txt (str): Path for transcript output.
             summarize (bool): Whether to generate summary.
-            ollama_model (str): Ollama model for summarization.
-            ollama_method (str): Method to use - 'library' or 'api'.
+            summary_provider (str): AI provider for summarization ('ollama', 'openai', 'anthropic', 'gemini').
+            summary_method (str): Method for Ollama ('library' or 'api'), ignored for others.
+            summary_model (str): Model to use for summarization (provider-specific defaults if None).
             **kwargs: Additional parameters for transcription.
             
         Returns:
@@ -255,7 +452,7 @@ class BaseTranscriber(ABC):
             if summarize:
                 summary_file = f"summary_{base_name}.txt"
                 result['summary'] = self._generate_summary(
-                    transcript_file, summary_file, ollama_model, ollama_method
+                    transcript_file, summary_file, summary_provider, summary_method, summary_model
                 )
             
             return result
@@ -271,27 +468,37 @@ class BaseTranscriber(ABC):
         logger.info(f"\nFile: {os.path.basename(media_file)}")
         logger.info(f"Format: {file_ext.upper()[1:]} ({file_size_mb:.1f} MB)")
     
-    def _generate_summary(self, transcript_file, summary_file, ollama_model, ollama_method):
-        """Generate summary from transcript file."""
+    def _generate_summary(self, transcript_file, summary_file, provider, method, model):
+        """Generate summary from transcript file using specified provider."""
         try:
             with open(transcript_file, 'r', encoding='utf-8') as f:
                 transcript_text = f.read()
             
-            if len(transcript_text.strip()) > 50:
-                if ollama_method.lower() == 'library':
-                    if OLLAMA_LIBRARY_AVAILABLE:
-                        return self.summarizer.summarize_with_library(transcript_text, summary_file, ollama_model)
-                    else:
-                        logger.warning("Ollama library not available, falling back to API method")
-                        return self.summarizer.summarize_with_api(transcript_text, summary_file, ollama_model)
-                else:
-                    return self.summarizer.summarize_with_api(transcript_text, summary_file, ollama_model)
-            else:
+            if len(transcript_text.strip()) < 50:
                 logger.warning("Transcript too short for summarization")
                 return None
+            
+            # Set default models if not specified
+            provider_defaults = {
+                'ollama': 'llama3.2',
+                'openai': 'gpt-4o-mini', 
+                'anthropic': 'claude-3-5-haiku-20241022',
+                'gemini': 'gemini-2.0-flash'
+            }
+            
+            if model is None:
+                model = provider_defaults.get(provider.lower(), 'llama3.2')
+            
+            return self.summarizer.summarize_text(
+                transcript_text, 
+                summary_file, 
+                provider=provider, 
+                method=method, 
+                model=model
+            )
                 
         except Exception as e:
-            logger.warning(f"Summarization failed: {str(e)}")
+            logger.warning(f"Summarization with {provider} failed: {str(e)}")
             logger.warning("Continuing without summary...")
             return None
     

@@ -7,7 +7,7 @@ A professional-grade Python library for transcribing audio/video files using mul
 - **Multiple Transcription Backends**: OpenAI Whisper and HuggingFace Transformers
 - **GPU Acceleration**: Automatic CUDA detection with CPU fallback
 - **Universal Format Support**: 20+ audio/video formats (MP4, MOV, AVI, MP3, WAV, etc.)
-- **AI-Powered Summarization**: Integration with Ollama models
+- **Multi-Provider AI Summarization**: Ollama, OpenAI, Anthropic Claude, and Google Gemini support
 - **Professional Architecture**: Clean, modular, and extensible design
 - **Model Caching**: Efficient memory usage with intelligent model caching
 - **Comprehensive Error Handling**: Robust error handling with helpful diagnostics
@@ -28,7 +28,7 @@ print(f"Summary: {result['summary']}")
 ### Advanced Usage
 
 ```python
-# HuggingFace backend with timestamps and language detection
+# HuggingFace backend with OpenAI summarization
 result = transcribe_media(
     'video.mp4',
     backend='huggingface',
@@ -37,7 +37,22 @@ result = transcribe_media(
     language='english',
     task='translate',
     summarize=True,
-    ollama_model='llama3.2'
+    summary_provider='openai',
+    summary_model='gpt-4o-mini'
+)
+
+# Using Anthropic Claude for summarization
+result = transcribe_media(
+    'video.mp4',
+    summary_provider='anthropic',
+    summary_model='claude-3-5-sonnet-20241022'
+)
+
+# Using Google Gemini
+result = transcribe_media(
+    'video.mp4',
+    summary_provider='gemini',
+    summary_model='gemini-2.0-flash'
 )
 ```
 
@@ -88,8 +103,9 @@ def transcribe_media(
     backend: str = "whisper",
     output_txt: Optional[str] = None,
     summarize: bool = True,
-    ollama_model: str = 'llama3.2',
-    ollama_method: str = 'library',
+    summary_provider: str = 'ollama',
+    summary_method: str = 'library',
+    summary_model: Optional[str] = None,
     **kwargs
 ) -> Dict[str, str]:
 ```
@@ -108,24 +124,69 @@ def transcribe_media(
 - `batch_size`: Batch size for processing
 - `chunk_length_s`: Chunk length in seconds
 
+### Summarization Parameters
+
+#### Universal Parameters
+- `summary_provider`: AI provider ('ollama', 'openai', 'anthropic', 'gemini')
+- `summary_model`: Model name (provider-specific defaults if None)
+- `summary_method`: For Ollama only ('library' or 'api')
+
+#### Provider-Specific Models
+
+**Ollama** (Local, Free)
+- `llama3.2`, `phi4-reasoning`, `qwen2.5`, etc.
+- Requires `ollama serve` running locally
+
+**OpenAI** (API)
+- `gpt-4o-mini` (cost-effective), `gpt-4o`, `gpt-4-turbo`
+- Requires `OPENAI_API_KEY`
+
+**Anthropic** (API)  
+- `claude-3-5-haiku-20241022` (fast), `claude-3-5-sonnet-20241022` (advanced)
+- Requires `ANTHROPIC_API_KEY`
+
+**Google Gemini** (API)
+- `gemini-2.0-flash` (latest, fast), `gemini-1.5-flash` (fast), `gemini-1.5-pro` (advanced)
+- Requires `GEMINI_API_KEY`
+
 ## 🔧 Installation
 
 ```bash
 # Core dependencies
 pip install torch whisper transformers moviepy requests
 
-# Optional: Ollama Python library for summarization
-pip install ollama
+# Optional: AI Summarization providers
+pip install ollama                      # For local Ollama models
+pip install openai                      # For OpenAI GPT models
+pip install anthropic                   # For Anthropic Claude models
+pip install google-genai               # For Google Gemini models
 
 # Optional: CUDA support (if you have NVIDIA GPU)
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 ```
 
+### Environment Variables
+
+For cloud-based summarization providers, set the appropriate API keys:
+
+```bash
+# OpenAI
+export OPENAI_API_KEY="your-openai-api-key"
+
+# Anthropic
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+
+# Google Gemini
+export GEMINI_API_KEY="your-gemini-api-key"
+```
+
 ## 💡 Examples
 
-See `src/TranscribeAI/examples.py` for comprehensive usage examples including:
+See `src/TranscribeAI/examples.py` for comprehensive transcription examples and `src/TranscribeAI/summarization_examples.py` for multi-provider summarization demos including:
 
 - Basic transcription workflows
+- Multi-provider summarization comparison
+- OpenAI, Anthropic, and Google Gemini integration examples
 - Advanced HuggingFace features
 - Multilingual support
 - Batch processing
@@ -163,11 +224,3 @@ This codebase follows professional software engineering practices:
 - Professional error handling and logging
 - Extensible design for adding new backends
 - Test-driven development patterns
-
-## 📄 License
-
-MIT License - see LICENSE file for details.
-
----
-
-**TranscribeAI v2.0** - Professional-grade transcription with the simplicity you need and the power you want.

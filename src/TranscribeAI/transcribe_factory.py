@@ -45,8 +45,12 @@ def transcribe_media(media_file: str,
                     backend: str = "whisper",
                     output_txt: Optional[str] = None,
                     summarize: bool = True,
-                    ollama_model: str = 'llama3.2',
-                    ollama_method: str = 'library',
+                    summary_provider: str = 'ollama',
+                    summary_method: str = 'library', 
+                    summary_model: Optional[str] = None,
+                    # Backward compatibility parameters
+                    ollama_model: Optional[str] = None,
+                    ollama_method: Optional[str] = None,
                     **kwargs) -> Dict[str, str]:
     """Main entry point for media transcription with automatic backend selection.
     
@@ -55,26 +59,50 @@ def transcribe_media(media_file: str,
         backend (str): Transcription backend to use ('whisper' or 'huggingface').
         output_txt (str): Optional output file path for transcript.
         summarize (bool): Whether to generate a summary.
-        ollama_model (str): Ollama model for summarization.
-        ollama_method (str): Summarization method ('library' or 'api').
+        summary_provider (str): AI provider for summarization ('ollama', 'openai', 'anthropic', 'gemini').
+        summary_method (str): Method for Ollama ('library' or 'api'), ignored for others.
+        summary_model (str): Model to use for summarization (provider-specific defaults if None).
+        ollama_model (str): DEPRECATED - use summary_model with summary_provider='ollama'.
+        ollama_method (str): DEPRECATED - use summary_method.
         **kwargs: Additional parameters specific to the chosen backend.
         
     Returns:
         dict: Dictionary containing paths to generated files.
         
-    Example:
+    Examples:
         # Basic usage with Whisper
         result = transcribe_media('video.mp4')
         
-        # Advanced usage with HuggingFace backend
+        # Advanced usage with OpenAI summarization
         result = transcribe_media(
             'video.mp4',
             backend='huggingface',
             model_size='large-v3',
-            return_timestamps=True,
-            language='english'
+            summary_provider='openai',
+            summary_model='gpt-4o-mini'
+        )
+        
+        # Using Anthropic Claude
+        result = transcribe_media(
+            'video.mp4',
+            summary_provider='anthropic',
+            summary_model='claude-3-5-sonnet-20241022'
         )
     """
+    # Handle backward compatibility
+    if ollama_model is not None:
+        import warnings
+        warnings.warn("ollama_model parameter is deprecated. Use summary_model with summary_provider='ollama'", 
+                     DeprecationWarning, stacklevel=2)
+        if summary_provider == 'ollama' and summary_model is None:
+            summary_model = ollama_model
+    
+    if ollama_method is not None:
+        import warnings
+        warnings.warn("ollama_method parameter is deprecated. Use summary_method", 
+                     DeprecationWarning, stacklevel=2)
+        summary_method = ollama_method
+    
     try:
         backend_enum = TranscriptionBackend(backend.lower())
     except ValueError:
@@ -87,7 +115,8 @@ def transcribe_media(media_file: str,
         media_file=media_file,
         output_txt=output_txt,
         summarize=summarize,
-        ollama_model=ollama_model,
-        ollama_method=ollama_method,
+        summary_provider=summary_provider,
+        summary_method=summary_method,
+        summary_model=summary_model,
         **kwargs
     ) 
