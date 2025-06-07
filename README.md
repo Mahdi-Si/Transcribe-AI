@@ -1,218 +1,173 @@
-# TranscribeAI
+# TranscribeAI v2.0 - Universal Media Transcription & Summarization
 
-🎵 **AI-Powered Media Transcription and Summarization Tool**
-
-TranscribeAI is a Python application that converts audio and video files into text transcripts using OpenAI's Whisper models, with optional AI-powered summarization through Ollama integration.
+A professional-grade Python library for transcribing audio/video files using multiple AI backends with optional AI-powered summarization.
 
 ## ✨ Features
 
-### 🎯 Core Functionality
-- **Media-to-Audio Conversion**: Extract audio from video files or process audio files directly
-- **AI Transcription**: High-accuracy speech-to-text using Whisper models
-- **Intelligent Summarization**: Generate comprehensive summaries using local Ollama models
+- **Multiple Transcription Backends**: OpenAI Whisper and HuggingFace Transformers
 - **GPU Acceleration**: Automatic CUDA detection with CPU fallback
-- **Multiple Formats**: Support for common audio/video formats
-
-### 🔧 Transcription Methods
-- **Standard Whisper**: Direct OpenAI Whisper integration (`transcribe_media.py`)
-- **Hugging Face Transformers**: Enhanced Whisper with advanced features (`transcribe_media_hf.py`)
-  - Chunked processing for long-form audio
-  - Word-level timestamps
-  - Language specification
-  - Translation capabilities
-  - Batch processing
-
-### 📊 Summarization Options
-- **Ollama Library**: Python library integration for local AI models
-- **Ollama API**: REST API integration with configurable endpoints
-- **Comprehensive Summaries**: Main topics, key points, conclusions, and context
+- **Universal Format Support**: 20+ audio/video formats (MP4, MOV, AVI, MP3, WAV, etc.)
+- **AI-Powered Summarization**: Integration with Ollama models
+- **Professional Architecture**: Clean, modular, and extensible design
+- **Model Caching**: Efficient memory usage with intelligent model caching
+- **Comprehensive Error Handling**: Robust error handling with helpful diagnostics
 
 ## 🚀 Quick Start
-
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone <repository-url>
-cd TranscribeAI
-```
-
-2. **Set up Python environment**
-```bash
-# Install uv package manager (recommended)
-pip install uv
-
-# Create virtual environment and install dependencies
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -r requirements.txt
-```
-
-3. **Install Ollama (optional, for summarization)**
-```bash
-# Install Ollama from https://ollama.ai
-# Pull a model for summarization
-ollama pull llama3.2
-```
 
 ### Basic Usage
 
 ```python
-from src.TranscribeAI.transcribe_media import process_media_file
+from TranscribeAI import transcribe_media
 
-# Transcribe and summarize a media file
-result = process_media_file(
-    media_file="path/to/your/video.mp4",
-    output_txt="transcript.txt",
-    model_size="base",
-    summarize=True,
-    ollama_model="llama3.2"
-)
+# Simple transcription with default Whisper backend
+result = transcribe_media('video.mp4')
+print(f"Transcript: {result['transcript']}")
+print(f"Summary: {result['summary']}")
 ```
 
-## 📚 Detailed Usage
-
-### Standard Whisper Method
+### Advanced Usage
 
 ```python
-from src.TranscribeAI.transcribe_media import process_media_file
-
-# Basic transcription only
-process_media_file(
-    media_file="audio.wav",
-    model_size="small",  # tiny, base, small, medium, large
-    summarize=False
-)
-
-# With summarization using Ollama library
-process_media_file(
-    media_file="video.mp4",
-    model_size="base",
+# HuggingFace backend with timestamps and language detection
+result = transcribe_media(
+    'video.mp4',
+    backend='huggingface',
+    model_size='large-v3',
+    return_timestamps=True,
+    language='english',
+    task='translate',
     summarize=True,
-    ollama_model="llama3.2",
-    ollama_method="library"  # or "api"
+    ollama_model='llama3.2'
 )
 ```
 
-### Hugging Face Enhanced Method
+### Command Line Interface
+
+```bash
+# Basic transcription
+python -m TranscribeAI.main video.mp4
+
+# Advanced options
+python -m TranscribeAI.main video.mp4 \
+  --backend huggingface \
+  --model-size large-v3 \
+  --timestamps \
+  --language english \
+  --ollama-model phi4-reasoning:latest
+```
+
+## 🏗️ Architecture
+
+The new v2.0 architecture follows professional software engineering principles:
+
+### Core Components
+
+- **`BaseTranscriber`**: Abstract base class for all transcription implementations
+- **`WhisperTranscriber`**: OpenAI Whisper implementation
+- **`HuggingFaceTranscriber`**: HuggingFace Transformers implementation  
+- **`TranscriptionFactory`**: Factory pattern for backend selection
+- **`MediaProcessor`**: Handles audio/video conversion
+- **`SummarizationEngine`**: AI-powered text summarization
+- **`DeviceManager`**: CUDA/CPU device management
+
+### Design Patterns Used
+
+- **Factory Pattern**: For backend selection and instantiation
+- **Strategy Pattern**: For different transcription algorithms
+- **Singleton Pattern**: For model caching and resource management
+- **Template Method**: For common transcription pipeline
+- **Dependency Injection**: For flexible component composition
+
+## 📚 API Reference
+
+### Main Function
 
 ```python
-from src.TranscribeAI.transcribe_media_hf import process_media_file_hf
-
-# Advanced transcription with timestamps
-process_media_file_hf(
-    media_file="long_video.mp4",
-    model_size="large-v3",
-    return_timestamps="word",  # "word" or True for segment timestamps
-    language="english",
-    task="transcribe",  # or "translate"
-    use_chunked=True,
-    batch_size=8
-)
+def transcribe_media(
+    media_file: str,
+    backend: str = "whisper",
+    output_txt: Optional[str] = None,
+    summarize: bool = True,
+    ollama_model: str = 'llama3.2',
+    ollama_method: str = 'library',
+    **kwargs
+) -> Dict[str, str]:
 ```
 
-## 🎛️ Configuration
+### Backend-Specific Parameters
 
-### Supported Media Formats
+#### Whisper Backend
+- `model_size`: 'tiny', 'base', 'small', 'medium', 'large'
 
-**Audio**: `.wav`, `.mp3`, `.aac`, `.flac`, `.ogg`, `.m4a`, `.wma`, `.aiff`
+#### HuggingFace Backend
+- `model_size`: 'tiny', 'base', 'small', 'medium', 'large', 'large-v3'
+- `return_timestamps`: True, False, or 'word'
+- `language`: Source language code (e.g., 'english', 'french')
+- `task`: 'transcribe' or 'translate'
+- `use_chunked`: Enable chunked processing for long audio
+- `batch_size`: Batch size for processing
+- `chunk_length_s`: Chunk length in seconds
 
-**Video**: `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`, `.wmv`, `.flv`, `.m4v`, `.3gp`, `.mpg`, `.mpeg`, `.ts`, `.mts`
+## 🔧 Installation
 
-### Whisper Model Sizes
-
-| Model | Parameters | VRAM | Speed | Accuracy |
-|-------|------------|------|-------|----------|
-| `tiny` | 39M | ~1GB | Fastest | Basic |
-| `base` | 74M | ~1GB | Fast | Good |
-| `small` | 244M | ~2GB | Moderate | Better |
-| `medium` | 769M | ~5GB | Slower | High |
-| `large` | 1550M | ~10GB | Slowest | Highest |
-| `large-v3` | 1550M | ~10GB | Slowest | Highest (latest) |
-
-### GPU Acceleration
-
-TranscribeAI automatically detects CUDA availability:
-- **GPU Available**: Uses CUDA acceleration for faster processing
-- **GPU Unavailable**: Falls back to CPU processing
-- **GPU Error**: Automatic fallback to CPU with warning
-
-## 📁 Project Structure
-
-```
-TranscribeAI/
-├── src/
-│   └── TranscribeAI/
-│       ├── main.py                 # Entry point
-│       ├── transcribe_media.py     # Standard Whisper implementation
-│       └── transcribe_media_hf.py  # Hugging Face enhanced implementation
-├── examples/                       # Example files and usage
-├── tests/                         # Unit tests
-├── pyproject.toml                 # Project configuration
-└── README.md                      # This file
-```
-
-## 🛠️ Development
-
-### Running Tests
 ```bash
-python -m pytest tests/
+# Core dependencies
+pip install torch whisper transformers moviepy requests
+
+# Optional: Ollama Python library for summarization
+pip install ollama
+
+# Optional: CUDA support (if you have NVIDIA GPU)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 ```
 
-### Code Style
-```bash
-# Format code
-black src/
-# Lint code
-flake8 src/
+## 💡 Examples
+
+See `src/TranscribeAI/examples.py` for comprehensive usage examples including:
+
+- Basic transcription workflows
+- Advanced HuggingFace features
+- Multilingual support
+- Batch processing
+- Error handling patterns
+- Factory pattern usage
+
+## 🔄 Migration from v1.0
+
+The new architecture maintains backward compatibility while providing deprecation warnings:
+
+```python
+# Old way (still works, but deprecated)
+from TranscribeAI.transcribe_media import process_media_file
+result = process_media_file('video.mp4')
+
+# New way (recommended)
+from TranscribeAI import transcribe_media
+result = transcribe_media('video.mp4')
 ```
 
-## 🗺️ Roadmap
+## 🎯 Performance Optimizations
 
-### Planned Features
+- **Model Caching**: Models are cached after first load
+- **GPU Memory Management**: Automatic memory cleanup and fallback
+- **Chunked Processing**: Efficient handling of long audio files
+- **Batch Processing**: Support for processing multiple files
+- **Resource Pooling**: Reuse transcriber instances for better performance
 
-#### 🔮 Future API Integrations
-- **OpenAI API**: Integration with GPT models for enhanced summarization
-  - Support for GPT-4 and GPT-3.5-turbo
-  - Configurable prompt templates
-  - Cost-aware usage tracking
+## 🛠️ Contributing
 
-- **Anthropic API**: Claude integration for alternative summarization
-  - Claude-3 Sonnet and Haiku models
-  - Context-aware summarization
-  - Safety-focused content analysis
+This codebase follows professional software engineering practices:
 
-#### 🚀 Enhanced Features
-- **Web Interface**: Browser-based UI for easy file upload and processing
-- **Batch Processing**: Process multiple files simultaneously
-- **Custom Prompts**: User-defined summarization templates
-- **Export Formats**: JSON, SRT, VTT subtitle formats
-- **Real-time Processing**: Live audio transcription
-- **Speaker Diarization**: Identify and separate multiple speakers
+- Clean, modular architecture with clear separation of concerns
+- Comprehensive docstrings and type hints
+- Professional error handling and logging
+- Extensible design for adding new backends
+- Test-driven development patterns
 
-## 🤝 Contributing
+## 📄 License
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [OpenAI Whisper](https://github.com/openai/whisper) for speech recognition
-- [Hugging Face Transformers](https://huggingface.co/transformers/) for enhanced Whisper implementation
-- [Ollama](https://ollama.ai) for local AI model integration
-- [MoviePy](https://zulko.github.io/moviepy/) for media processing
-
-## 📞 Support
-
-For questions, issues, or contributions, please open an issue on the GitHub repository.
+MIT License - see LICENSE file for details.
 
 ---
 
-*Built with ❤️ for accessible AI-powered transcription*
+**TranscribeAI v2.0** - Professional-grade transcription with the simplicity you need and the power you want.
